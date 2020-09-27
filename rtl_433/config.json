@@ -1,0 +1,27 @@
+{
+  "name": "rtl_433",
+  "version": "1",
+  "slug": "rtl_433",
+  "description": "Receive radio signals from sensors and publish the readings to MQTT",
+  "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
+  "startup": "before",
+  "boot": "auto",
+  "usb": true,
+  "full_access": true,
+  "options": {
+    "mqtt": {
+      "host": "core-mosquitto",
+      "port": 1883,
+      "devices": "rtl_433/hass/devices[/type][/model][/subtype][/channel][/id]"
+    },
+    "protocols": []
+  },
+  "schema": {
+    "mqtt": {
+      "host": "str",
+      "port": "int",
+      "devices": "str"
+    },
+    "protocols": ["int"]
+  }
+}
