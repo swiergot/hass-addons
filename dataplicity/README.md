@@ -9,7 +9,7 @@ With the default configuration, access to the Home Assistant's web interface is 
 The add-on requires a user code to be provided (option `code`). The code can be found when the "ADD NEW DEVICE" button is pressed on the [devices page](https://www.dataplicity.com/devices/). It's in the installation command:
 
 ```
-curl -s https://www.dataplicity.com/THIS_IS_THE_CODE.py** | sudo python
+curl -s https://www.dataplicity.com/THIS_IS_THE_CODE.py | sudo python
 ```
 
 When the add-on is started for the first time, it will register a new device and write the device's credentials into the add-on's configuration. Thanks to that, when the add-on is restarted in the future, it will not create another device but instead it will connect as the originally created one.
