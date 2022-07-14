@@ -1,0 +1,258 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+
+  <title>SysLog Viewer</title>
+  <meta name="description" content="SysLog Viewer for Home Assistant">
+  <meta name="author" content="Jarek">
+
+  <style>
+    body {
+      background-color: white;
+    }
+    pre {
+      font-size: 75%;
+    }
+    .fill-parent-height {
+      height: 100%;
+    }
+    .v-select__selections input {
+      display: none;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id="app">
+    <v-app id="inspire">
+      <v-content style="height: 100vh">
+        <v-container fluid pa-0 class="d-flex flex-column flex-grow-1 fill-parent-height">
+          <v-row no-gutters class="flex-grow-1 flex-shrink-1 pl-2">
+            <v-col cols="9" class="fill-parent-height">
+              <pre>
+<template v-for="message in messages"><template v-if="visible(message)">{{ formatTS(message) }}  {{ message.hostname.padEnd(21) }}  <span :class="severityColor(message.severity)">{{ message.severity.toUpperCase() }}</span>{{ " ".repeat(7 - message.severity.length) }}  {{ message.msg }}</template></template>
+
+
+
+              </pre>
+            </v-col>
+          </v-row>
+        </v-container>
+      </v-content>
+      <v-footer app class="flex-nowrap">
+        <v-select
+          v-model="selected_apps"
+          :items="known_apps"
+          hide-details
+          multiple
+          outlined
+          dense
+        >
+          <template v-slot:selection="{ item, index }">
+            <v-chip v-if="index <= (displayed_apps - 1)" small>
+              <span>{{ item }}</span>
+            </v-chip>
+            <span v-if="index === displayed_apps" class="grey--text text-caption">
+              (+{{ selected_apps.length - displayed_apps }} others)
+            </span>
+          </template>
+        </v-select>
+
+        <v-spacer></v-spacer>
+
+        <v-select
+          v-model="selected_sevs"
+          :items="known_sevs"
+          hide-details
+          multiple
+          outlined
+          dense
+        >
+          <template v-slot:selection="{ item, index }">
+            <v-chip v-if="index <= (displayed_sevs - 1)" small :class="severityColor(item)">
+              <span>{{ item }}</span>
+            </v-chip>
+            <span v-if="index === displayed_sevs" class="grey--text text-caption">
+              (+{{ selected_sevs.length - displayed_sevs }} others)
+            </span>
+          </template>
+        </v-select>
+
+        <v-spacer></v-spacer>
+
+        <v-menu
+          v-model="menu"
+          :close-on-content-click="false"
+          :nudge-right="40"
+          transition="scale-transition"
+          offset-y
+          min-width="auto"
+        >
+          <template v-slot:activator="{ on, attrs }">
+            <v-text-field
+              v-model="date"
+              prepend-icon="mdi-calendar"
+              readonly
+              v-bind="attrs"
+              v-on="on"
+            ></v-text-field>
+          </template>
+          <v-date-picker
+            v-model="date"
+            :allowed-dates="allowedDates"
+            @input="menu = false"
+          ></v-date-picker>
+        </v-menu>
+
+        <v-spacer></v-spacer>
+
+        <v-checkbox
+          v-model="local_time"
+          label="Local time"
+        ></v-checkbox>
+
+        <v-spacer></v-spacer>
+
+        <v-checkbox
+          v-model="scrolling"
+          label="Autoscroll"
+        ></v-checkbox>
+      </v-footer>
+    </v-app>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <script>
+    const severities = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERR", "CRIT", "ALERT", "EMERG"];
+
+    const app = new Vue({
+      el: '#app',
+      vuetify: new Vuetify(),
+      data() {
+        return {
+          scrolling: true,
+          local_time: true,
+          messages: [],
+          known_apps: [],
+          selected_apps: [],
+          known_sevs: severities,
+          selected_sevs: severities.filter(item => item !== "DEBUG"), // DEBUG is unselected by default
+          displayed_apps: 2,
+          displayed_sevs: 3,
+          date: (new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000)).toISOString().substr(0, 10),
+          last_date: null,
+          menu: false,
+        }
+      },
+      methods: {
+        severityColor(sev) {
+          switch (sev.toLowerCase()) {
+            case 'debug'  : return "blue-grey--text";
+            case 'info'   : return "green--text";
+            case 'notice' : return "orange--text";
+            case 'warning': return "blue--text";
+            case 'err'    : return "red--text";
+            case 'crit'   : return "purple--text";
+            case 'alert'  : return "purple--text font-weight-bold";
+            case 'emerg'  : return "white-text purple font-weight-bold";
+          }
+        },
+        formatTS(msg) {
+          return this.local_time ? utc2local(msg.timestamp) : msg.timestamp;
+        },
+        visible(msg) {
+          return visible(msg);
+        },
+        allowedDates(val) {
+          return new Date(val) <= new Date();
+        },
+      }
+    });
+
+    function visible(msg) {
+      return app.selected_apps.includes(msg.hostname) && app.selected_sevs.includes(msg.severity.toUpperCase());
+    }
+
+    function scrollMessages() {
+      if (app.scrolling) {
+        app.$nextTick(function () {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+      }
+    }
+
+    function messagesInit() {
+      $.ajax("messages/" + app.date + "/0", {
+        dataType: "json"
+      })
+      .done(function(res) {
+        app.last_date = app.date;
+        app.messages = res;
+        postUpdate(res);
+      });
+    }
+
+    function messagesRefresh() {
+      if (app.date != app.last_date) {
+        app.messages = [];
+      }
+
+      if (app.messages.length === 0) {
+        messagesInit();
+        return;
+      }
+
+      var last_row_id = app.messages.at(-1).row_id;
+
+      $.ajax("messages/" + app.date + "/" + last_row_id, {
+        dataType: "json"
+      })
+      .done(function(res) {
+        app.messages.push.apply(app.messages, res);
+        postUpdate(res);
+      });
+    }
+
+    function postUpdate(res) {
+      if (res.length > 0) {
+        // Check for new apps only if there are any new records
+        updateAppFilter();
+      }
+      var scroll = res.filter(visible).length > 0;
+      if (scroll) {
+        // Scroll the page only if any of the new records are visible
+        scrollMessages();
+      }
+      setTimeout(messagesRefresh, 1000);
+    }
+
+    function updateAppFilter() {
+      var all_known_apps = Array.from(new Set(app.messages.map(item => item.hostname)));
+      var new_known_apps = all_known_apps.filter(item => !app.known_apps.includes(item));
+      app.known_apps.push.apply(app.known_apps, new_known_apps);
+      // New applications are selected by default
+      app.selected_apps.push.apply(app.selected_apps, new_known_apps);
+    }
+
+    function utc2local(utc) {
+      var ts = new Date(utc);
+      var micros = utc.substr(20, 6);
+      return `${ts.getFullYear()}-${(ts.getMonth() + 1).toString().padStart(2, "0")}-${ts.getDate().toString().padStart(2, "0")}T${ts.getHours().toString().padStart(2, "0")}:${ts.getMinutes().toString().padStart(2, "0")}:${ts.getSeconds().toString().padStart(2, "0")}.${micros} `;
+    }
+
+    console.log("Starting");
+    messagesInit();
+  </script>
+</body>
+</html>

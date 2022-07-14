@@ -1,0 +1,48 @@
+#!/usr/bin/env bashio
+
+CONFIG_PATH=/data/options.json
+NGINX_TEMPLATE=/etc/nginx/default.conf.template
+NGINX_CONFIG=/etc/nginx/http.d/default.conf
+PADDING="                "
+
+cat ${NGINX_TEMPLATE} > ${NGINX_CONFIG}
+
+ACCESS_CONTROL=$(jq --raw-output ".access_control" $CONFIG_PATH)
+
+if [ "$ACCESS_CONTROL" = "true" ]
+then
+    bashio::log.info "NGINX access control enabled"
+
+    DEFAULT_POLICY=$(jq --raw-output ".default_policy" $CONFIG_PATH)
+    ACCESS_CONFIG="${PADDING}# Access control\n"
+
+    if [ "$DEFAULT_POLICY" = "allow" ]
+    then
+        bashio::log.info "Default policy is allow"
+
+        DENY=$(jq --raw-output '.deny | join(" ")' $CONFIG_PATH)
+
+        for ITEM in $DENY
+        do
+            ACCESS_CONFIG="$ACCESS_CONFIG${PADDING}deny $ITEM;\n"
+        done
+
+        ACCESS_CONFIG="$ACCESS_CONFIG${PADDING}allow all;"
+    else
+        bashio::log.info "Default policy is deny"
+
+        ALLOW=$(jq --raw-output '.allow | join(" ")' $CONFIG_PATH)
+
+        for ITEM in $ALLOW
+        do
+            ACCESS_CONFIG="$ACCESS_CONFIG${PADDING}allow $ITEM;\n"
+        done
+
+        ACCESS_CONFIG="$ACCESS_CONFIG${PADDING}deny all;"
+    fi
+
+    bashio::log.info "Access configuration:\n$ACCESS_CONFIG"
+    sed -r -i "s:^.*### ACCESS CONTROL PLACEHOLDER.*$:$ACCESS_CONFIG:" $NGINX_CONFIG
+else
+    bashio::log.info "NGINX access control disabled"
+fi

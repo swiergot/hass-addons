@@ -1,0 +1,30 @@
+{
+  "name": "rtl_433",
+  "version": "1",
+  "slug": "rtl_433",
+  "description": "Home Assistant add-on that runs rtl_433",
+  "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
+  "boot": "auto",
+  "usb": true,
+  "full_access": true,
+  "options": {
+    "mqtt": {
+      "host": "core-mosquitto",
+      "port": 1883,
+      "user": null,
+      "password": null,
+      "devices": "rtl_433/hass/devices[/type][/model][/subtype][/channel][/id]"
+    },
+    "protocols": []
+  },
+  "schema": {
+    "mqtt": {
+      "host": "str",
+      "port": "int",
+      "user": "str?",
+      "password": "str?",
+      "devices": "str"
+    },
+    "protocols": ["int"]
+  }
+}

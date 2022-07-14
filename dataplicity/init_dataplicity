@@ -1,0 +1,79 @@
+#!/usr/bin/env bashio
+
+CONFIG_PATH=/data/options.json
+CONFIG_TMP_PATH=/tmp/options.json
+
+TUNNEL_DIR=/opt/dataplicity/tuxtunnel
+SERIAL_FILE=$TUNNEL_DIR/serial
+AUTH_FILE=$TUNNEL_DIR/auth
+
+TOKEN_FILE=/run/s6/container_environment/SUPERVISOR_TOKEN
+SUPERVISOR_TOKEN=$(cat $TOKEN_FILE)
+
+CODE=$(jq --raw-output ".code" $CONFIG_PATH)
+
+bashio::log.info "Code '$CODE' has been provided"
+
+if ! echo "$CODE" | egrep -q '^[0-9a-z]+$'
+then
+    bashio::log.error "The code has not been specified or is invalid"
+    exit 1
+fi
+
+SERIAL=$(jq --raw-output ".serial" $CONFIG_PATH 2> /dev/null)
+AUTH=$(jq --raw-output ".auth" $CONFIG_PATH 2> /dev/null)
+
+if echo "$SERIAL" | egrep -q '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+then
+    if echo "$AUTH" | egrep -q '^[0-9a-zA-Z]+$'
+    then
+        bashio::log.info "Serial '$SERIAL' and token '$AUTH' have been provided"
+        mkdir -p $TUNNEL_DIR
+        echo -n "$SERIAL" > $SERIAL_FILE
+        echo -n "$AUTH" > $AUTH_FILE
+    fi
+fi
+
+bashio::log.info "Running Dataplicity installer"
+curl -s https://www.dataplicity.com/$CODE.py | python
+
+if [ $? -ne 0 ]
+then
+    bashio::log.error "Dataplicity installer has failed"
+    exit 1
+fi
+
+cat /etc/supervisord.conf.orig > /etc/supervisord.conf
+
+if [ $? -ne 0 ]
+then
+    bashio::log.error "Failed to restore supervisord.conf"
+    exit 1
+fi
+
+cat /etc/supervisor/conf.d/tuxtunnel.conf >> /etc/supervisord.conf
+
+if [ $? -ne 0 ]
+then
+    bashio::log.error "Failed to modify supervisord.conf"
+    exit 1
+fi
+
+bashio::log.info "Updating add-on configuration with serial and token"
+
+SERIAL=$(cat $SERIAL_FILE)
+AUTH=$(cat $AUTH_FILE)
+
+echo -n '{ "options" : ' > $CONFIG_TMP_PATH
+jq ".serial = \"$SERIAL\" | .auth = \"$AUTH\"" $CONFIG_PATH >> $CONFIG_TMP_PATH
+echo "}" >> $CONFIG_TMP_PATH
+
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SUPERVISOR_TOKEN" -d @$CONFIG_TMP_PATH http://supervisor/addons/self/options
+
+if [ $? -ne 0 ]
+then
+    bashio::log.error "Failed to update configuration"
+    exit 1
+fi
+
+bashio::log.info "Dataplicity installation successful"

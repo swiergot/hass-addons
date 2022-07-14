@@ -1,0 +1,16 @@
+{
+  "name": "SysLog Server",
+  "version": "1",
+  "slug": "syslog",
+  "ingress": true,
+  "description": "SysLog Server for Home Assistant",
+  "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
+  "startup": "application",
+  "boot": "auto",
+  "panel_icon": "mdi:file-document",
+  "options": {},
+  "schema": {},
+  "ports": {
+    "1514/udp": 514
+  }
+}
